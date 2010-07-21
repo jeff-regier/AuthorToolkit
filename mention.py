@@ -25,15 +25,28 @@ import utils
 class MalformedAuthorName(Exception):
     pass
 
-class AuthorRef():
-    def __init__(self, name_str):
+class Mention():
+    def __init__(self):
+        pass
+
+    def load_author_alias(self, name_str):
         self.original_name = name_str
         self.merged_name = name_str #this gets overwritten
         self.first_name, self.middle_names, self.last_name, self.suffix = self.split_name()
+        if len(self.middle_names) > 4:
+            msg = "Too many middle names in '%s'" % self
+            raise MalformedAuthorName(msg)
+
+    def load_clean_name(self, fn, mns, ln, suffix):
+        self.first_name, self.middle_names, self.last_name, self.suffix = \
+            (fn, mns, ln, suffix)
+
+        name_str = " ".join([fn] + mns + [ln])
+        self.original_name = name_str
+        self.merged_name = name_str #this gets overwritten
 
     @classmethod
     def intersected_name(cls, e1, e2):
-        assert utils.compatible_names(e1, e2)
         fn = utils.shorter(e1.fn(), e2.fn())
 
         mns = []
@@ -41,11 +54,11 @@ class AuthorRef():
         if len(mns1) == len(mns2):
             mns = [utils.shorter(mns1[mi], mns2[mi]) for mi in xrange(len(mns1))]
 
-        assert e1.ln() == e2.ln()
         ln = e1.ln()
 
-        name_str = " ".join([fn] + mns + [ln])
-        return cls(name_str)
+        a = cls()
+        a.load_clean_name(fn, mns, ln, "")
+        return a
 
     def __str__(self):
         return self.original_name
@@ -54,14 +67,14 @@ class AuthorRef():
         name_str = self.original_name.decode('utf-8')
         name_str = unidecode(name_str)
         name_str = re.sub(r'\s+', ' ', name_str)
-        name_str = re.sub(r'[^a-zA-Z .-]', '', name_str)
+        name_str = re.sub(r'[^a-zA-Z .,-]', '', name_str)
         name_str = re.sub(r' -|- ', ' ', name_str)
         name_str = re.sub(r'--+', '-', name_str)
         name_str = re.sub(r'(?i)^(Dr|Mr|Mrs|Ms)\. ', '', name_str)
         name_str = re.sub('^([A-Z])([A-Z]) ', r'\1. \2. ', name_str)
         name_str = re.sub('^([A-Z][a-z]+)\. ', r'\1 ', name_str)
         name_str = re.sub('\. *', ' ', name_str)
-        name_str = re.sub(' ((van|de|del|da|do|el|la|di|von|der) )+', ' ', name_str)
+        name_str = re.sub('(:? |^)((van|de|del|da|do|el|la|di|von|der) )+', ' ', name_str)
         name_str = re.sub(r'^ +| +$', '', name_str)
         name_str = re.sub(r'\s+', ' ', name_str)
         return name_str.lower()
@@ -100,6 +113,9 @@ class AuthorRef():
     def full_name(self):
         return " ".join([self.first_name] + self.middle_names + [self.last_name])
 
+    def last_first(self):
+        return " ".join([self.last_name + ","] + [self.first_name] + self.middle_names)
+
     def fn(self):
         return self.first_name
 
@@ -110,22 +126,61 @@ class AuthorRef():
         return self.last_name
 
     def name_variants(self):
-        ret = [self.full_name()]
-        if len(self.first_name) != 1:
-            ret.append(self.first_name[0] + ' ' + self.last_name)
-            if self.middle_names:
-                ret.append(self.first_name + ' ' + self.last_name)
+        ret = set([self.full_name()])
+        m_string = " ".join(self.mns())
+        ret.add("%s %s" % (self.fn(), self.ln()))
+        ret.add("%s %s" % (self.fn()[0], self.ln()))
+        if self.mns():
+            ret.add("%s %s %s" % (self.fn(), m_string, self.ln()))
+            ret.add("%s %s %s" % (self.fn()[0], m_string, self.ln()))
         return ret
 
     def token(self):
-        t = "%s_%s" % (self.last_name, self.first_name[0])
-        t = re.sub(r'\W', '', t)
-        if len(t) < 3:
-            msg = "Cannot create token for '%s'." % self
-            raise MalformedAuthorName(msg)
-        return t.lower()
+        return "%s_%s" % (self.last_name, self.first_name[0])
 
     def drop_first_name(self):
         self.first_name = self.middle_names[0]
         self.middle_names = self.middle_names[1:]
+
+    def repr_tsv(self):
+        mn = " ".join(self.mns())
+        name_tsv = "\t".join([self.fn(), mn, self.ln()])
+        return "\t".join([self.article_id, self.author_id, name_tsv,])
+
+    def name_length(self):
+        return len(self.full_name())
+
+
+    def change_last_name(self, new_last):
+        self.last_name = new_last
+
+    def backup_name(self):
+        self.former_fn = self.fn()
+        self.former_mns = self.mns()
+        self.former_ln = self.ln()
+
+    def restore_name(self):
+        self.first_name = self.former_fn
+        self.middle_names = self.former_mns
+        self.last_name = self.former_ln
+
+    def drop_first_name(self):
+        self.backup_name()
+        self.first_name = self.mns()[0]
+        self.middle_names = self.mns()[1:]
+
+    def drop_hyphenated_ln(self):
+        self.backup_name()
+        import re
+        self.last_name = re.sub(r'-\w+$', '', self.ln())
+
+    def fix_spelling(self, pc):
+        self.backup_name()
+        fn, mns, ln = pc.fn(), pc.mns(), pc.ln()
+        if not utils.compatible_name_part(fn, self.fn()):
+            self.first_name = fn
+        if mns != self.mns():
+            self.middle_names = mns
+        if ln != self.ln():
+            self.change_last_name(ln)
 

@@ -18,7 +18,7 @@
 
 import sys, re
 from collections import defaultdict
-from author_ref import AuthorRef
+from mention import Mention
 import config, utils, speller
 
 
@@ -42,7 +42,7 @@ class PriorNameDist():
         self.fn_map, self.fl_map, self.ln_map = Counter(), Counter(), Counter()
         self.cache = {}
 
-    def add_author(self, r):
+    def add_mention(self, r):
         self.fl_map.incr(r.fn()[0])
         if len(r.fn()) > 1:
             self.fl_map.incr(r.fn())
@@ -95,7 +95,7 @@ class PriorNameDist():
         if cache_key in self.cache:
             return self.cache[cache_key]
 
-        iname = AuthorRef(p1, p2)
+        iname = Mention(p1, p2)
         gen_prob2 = self.prob_gen(iname.fn(), iname.mns(), iname.ln())
         gen_prob = self.common_prob_gen(p1, p2)
 
