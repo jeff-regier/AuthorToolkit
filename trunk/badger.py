@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -u
 
 # Copyright 2009, Jeffrey Regier, jeff [at] stat [dot] berkeley [dot] edu
 
@@ -17,11 +17,12 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Badger.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys, re, random, pickle, copy
+import sys, re, random, copy
+from cPickle import load
 from collections import defaultdict
 from cluster import Cluster
 from agglomerator import Agglomerator
-from author_ref import AuthorRef, MalformedAuthorName
+from mention import Mention, MalformedAuthorName
 import name_dist
 import speller
 import output
@@ -29,8 +30,8 @@ import config
 import utils
 
 
-author_refs = set()
-paper_to_refs = defaultdict(set)
+mentions = set()
+article_to_mentions = defaultdict(set)
 
 name_dist = name_dist.PriorNameDist()
 
@@ -38,33 +39,17 @@ name_dist = name_dist.PriorNameDist()
 def load_name_dist(name_dist_file):
     print "loading name_dist"
     name_dist_fh = open(name_dist_file)
-    pieces = pickle.load(name_dist_fh)
+    pieces = load(name_dist_fh)
     name_dist_fh.close()
     name_dist.load_pieces(pieces)
 
 
-def load_names(in_file):
-    print "loading names"
-
-    names_handle = open(in_file)
-    for n in names_handle:
-        try:
-            vals = n.rstrip().split("\t")
-            if not config.truth_mode:
-                vals.append(False)
-            [paper, names, truth] = vals
-            for name in names.split(","):
-                try:
-                    r = AuthorRef(name)
-                    r.paper = paper
-                    r.truth = truth
-
-                    author_refs.add(r)
-                    paper_to_refs[paper].add(r)
-                except MalformedAuthorName, e:
-                    print e
-        except ValueError, e:
-            print "Cannot split line '%s'" % n.rstrip()
+def load_mentions(in_file):
+    print "loading mentions"
+    pickle_handle = open(in_file, "r")
+    local_mentions = load(pickle_handle)
+    for m in local_mentions:
+        mentions.add(m)
 
 
 def name_sameness(p1, p2):
@@ -74,10 +59,11 @@ def name_sameness(p1, p2):
     gen_prob = name_dist.common_prob_gen(p1, p2)
     expected_others = config.expected_authors * gen_prob
 
-    assert p1.parent == p2.parent
-    agg = p1.parent
-    intersected_name = AuthorRef.intersected_name(p1, p2)
-    distinct_names = agg.distinct_authors(intersected_name)
+    distinct_names = 1
+#    if p1.parent == p2.parent:
+#        agg = p1.parent
+#        intersected_name = Mention.intersected_name(p1, p2)
+#        distinct_names = agg.distinct_authors(intersected_name)
 
     prob_same = 1. / (distinct_names + expected_others)
 
@@ -85,14 +71,18 @@ def name_sameness(p1, p2):
 
 
 def bootstrap_merge():
-    print "bootstrap merge"
+    print "bootstrap merge [%d clusters]" % len(mentions)
 
-    token_to_refs = defaultdict(set)
-    for r in author_refs:
-        token_to_refs[r.token()].add(r)
+    token_to_mentions = defaultdict(set)
+    for r in mentions:
+        token_to_mentions[r.token()].add(r)
 
-    for t, local_refs in token_to_refs.iteritems():
-        agg = Agglomerator(local_refs)
+    print "  loading agglomerators"
+    for t, local_mentions in token_to_mentions.iteritems():
+        agg = Agglomerator(local_mentions)
+
+    print "  running merge"
+    for agg in Agglomerator.INSTANCES:
         agg.run_merge(name_sameness, config.bootstrap_threshold)
 
 
@@ -108,10 +98,10 @@ def coauthor_likelihoods(p1, p2):
     """
     def get_coauthors(p):
         ret = set()
-        for r in p.author_refs:
-            for co_r in paper_to_refs[r.paper]:
-                if r != co_r:
-                    co_p = Agglomerator.REF_TO_CLUSTER[co_r]
+        for m in p.mentions:
+            for co_m in article_to_mentions[m.article_id]:
+                if m != co_m:
+                    co_p = Agglomerator.MENTION_TO_CLUSTER[co_m]
                     ret.add(co_p)
         return ret
 
@@ -136,7 +126,10 @@ def collective_sameness(p1, p2):
 
 
 def collective_merge():
-    print "collective merge"
+    print "collective merge [%d clusters]" % len(Agglomerator.CLUSTERS)
+
+    for m in mentions:
+        article_to_mentions[m.article_id].add(m)
 
     for agg in Agglomerator.INSTANCES:
         agg.run_merge(collective_sameness, config.merge_threshold)
@@ -200,7 +193,7 @@ def correct_spellings():
             vocab[name] += 1
             name_to_parts[name].add(p)
 
-    print "\tspeller loaded"
+    print "  speller loaded"
 
     sp = speller.Speller(vocab)
 
@@ -213,9 +206,14 @@ def correct_spellings():
         targets = set()
         for c in candidates:
             for p2 in name_to_parts[c]:
-                if p != p2 and p2 in Agglomerator.CLUSTERS and\
-                    utils.compatible_names(p2, AuthorRef(c)):
-                    targets.add(p2)
+                if p != p2 and p2 in Agglomerator.CLUSTERS:
+                    try:
+                        c_author = Mention()
+                        c_author.load_author_alias(c) #speed up by loading clean name
+                        if utils.compatible_names(p2, c_author):
+                            targets.add(p2)
+                    except MalformedAuthorName, e:
+                        pass
         #TODO: we should consider misspellings with multiple targets
         if len(targets) != 1:
             continue
@@ -226,9 +224,10 @@ def correct_spellings():
 
         p2 = min(targets)
 
-        (p_wrong, p_right) = (p, p2) if p.num_refs() < p2.num_refs() else (p2, p)
+        (p_wrong, p_right) = (p, p2) \
+            if p.num_mentions() < p2.num_mentions() else (p2, p)
 
-        if p_right.shared_papers(p_wrong):
+        if p_right.shared_articles(p_wrong):
             continue
 
         prior1 = name_dist.misspelled_prob_same(p_right, p_wrong)
@@ -248,14 +247,14 @@ if __name__ == "__main__":
         print "usage: %s <name_dist> <names_in_file> <names_out_file>" % sys.argv[0]
     else:
         load_name_dist(sys.argv[1])
-        load_names(sys.argv[2])
+        load_mentions(sys.argv[2])
 
         bootstrap_merge()
         collective_merge()
 
-        drop_first_names()
-        drop_hyphenated_last_names()
-        correct_spellings()
+#        drop_first_names()
+#        drop_hyphenated_last_names()
+#        correct_spellings()
 
         output.Output(sys.argv[3], Agglomerator.CLUSTERS).output_all()
 

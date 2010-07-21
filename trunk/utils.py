@@ -20,17 +20,20 @@ import re
 from collections import defaultdict
 
 
+re_ss = re.compile(r'^.* (\S)\S*$')
+
+
 def compatible_name_part(w1, w2):
-    w1 = re.sub(r'\W', '', w1)
-    w2 = re.sub(r'\W', '', w2)
-    l = min(len(w1), len(w2))
-    if not l:
+    if w1 == w2:
         return True
-    return w1[:l] == w2[:l]
+    elif len(w1) != 1 and len(w2) != 1:
+        return False
+    else:
+        return w1[0] == w2[0]
 
 
 def compatible_names(e1, e2):
-    """This function takes either PartitionParts or AuthorRefs as arguments
+    """This function takes either PartitionParts or Mentions as arguments
     """
 
     if e1.ln() != e2.ln():
@@ -77,7 +80,7 @@ def shorter(s1, s2):
 def same_fl_initials(name1, name2):
     if name1[0] != name2[0]:
         return False
-    li1 = re.sub(r'^.* (\S)\S*$', r'\1', name1)
-    li2 = re.sub(r'^.* (\S)\S*$', r'\1', name2)
+    li1 = re_ss.sub(r'\1', name1)
+    li2 = re_ss.sub(r'\1', name2)
     return li1 == li2
 

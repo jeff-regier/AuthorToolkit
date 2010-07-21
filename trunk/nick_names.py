@@ -22,6 +22,7 @@ nick_names = {
     "tony": "anthony",
     "art": "arthur",
     "arty": "arthur",
+    "alex": "alexander",
     "bernie": "bernard",
     "bern": "bernard",
     "charlie": "charles",

@@ -23,13 +23,13 @@ import config
 class Output():
     def __init__(self, out_base, parts):
         self.out_base = out_base
-        self.author_refs = set()
+        self.mentions = set()
         self.parts = parts
         for p in parts: #hack
             name = p.full_name()
             for a in p:
                 a.merged_name = name
-                self.author_refs.add(a)
+                self.mentions.add(a)
 
     def convert_names(self):
         print "outputing author names"
@@ -38,13 +38,13 @@ class Output():
         ordered_parts.sort(key=lambda p: p.full_name())
         for pi in xrange(len(ordered_parts)):
             p = ordered_parts[pi]
-            for a in sorted(p.author_refs, key=lambda r: r.original_name):
-                out_test_handle.write("%d\t%s\t%s\n" % (pi + 1, a.original_name, a.paper))
+            for a in sorted(p.mentions, key=lambda r: r.original_name):
+                out_test_handle.write("%d\t%s\t%s\n" % (pi + 1, a.original_name, a.article_id))
 
     def output_need_merge(self):
-        truth_to_authors = {}
-        for a in self.author_refs:
-            truth_to_authors.setdefault(a.truth, []).append(a)
+        author_to_mentions = {}
+        for a in self.mentions:
+            author_to_mentions.setdefault(a.author_id, []).append(a)
 
         def all_same_prediction(authors):
             if not authors:
@@ -63,7 +63,7 @@ class Output():
 
         merges_needed = 0
         out_handle = open(self.out_base + ".nm", "w")
-        for t, authors in truth_to_authors.items():
+        for t, authors in author_to_mentions.items():
             if not all_same_prediction(authors):
                 merges_needed += 1
                 names = [a.merged_name for a in authors]
@@ -73,45 +73,45 @@ class Output():
 
     def output_need_split(self):
         prediction_to_authors = {}
-        for a in self.author_refs:
+        for a in self.mentions:
             prediction_to_authors.setdefault(a.merged_name, []).append(a)
 
-        def all_same_truth(authors):
+        def all_same_author_id(authors):
             if not authors:
                 return True #vacuously true
             prev = authors[0]
             for a in authors:
-                if a.truth != prev.truth:
+                if a.author_id != prev.author_id:
                     return False
             return True
 
         splits_needed = 0
         out_handle = open(self.out_base + ".ns", "w")
         for p, authors in prediction_to_authors.items():
-            truths_to_authors = defaultdict(set)
+            author_to_aliases = defaultdict(set)
             for a in authors:
-                truths_to_authors[a.truth].add(a.full_name())
-            if len(truths_to_authors.keys()) > 1:
+                author_to_aliases[a.author_id].add(a.full_name())
+            if len(author_to_aliases.keys()) > 1:
                 splits_needed += 1
-                names = [max(author_set, key=len) for author_set in truths_to_authors.values()]
+                names = [max(author_set, key=len) for author_set in author_to_aliases.values()]
                 out_handle.write("%s\n" % ", ".join(names))
 
         print "splits needed: %d" % splits_needed
 
     def compute_performance(self):
-        me_to_doc = defaultdict(float)
-        truth_to_doc = defaultdict(float)
+        me_to_num_articles = defaultdict(float)
+        author_to_num_articles = defaultdict(float)
         truth_to_me = {}
 
-        for a in self.author_refs:
-            me_to_doc[a.merged_name] += 1
-            truth_to_doc[a.truth] += 1
-            truth_to_me.setdefault(a.truth, defaultdict(float))[a.merged_name] += 1
+        for a in self.mentions:
+            me_to_num_articles[a.merged_name] += 1
+            author_to_num_articles[a.author_id] += 1
+            truth_to_me.setdefault(a.author_id, defaultdict(float))[a.merged_name] += 1
 
         def get_f_cell(truth, me):
             n1 = truth_to_me[truth].get(me, [])
-            n2 = me_to_doc[me]
-            n3 = truth_to_doc[truth]
+            n2 = me_to_num_articles[me]
+            n3 = author_to_num_articles[truth]
             precision = n1 / n2
             recall = n1 / n3
             return (2 * precision * recall) / (precision + recall)
@@ -125,11 +125,11 @@ class Output():
             return best_fscore
 
         total_true = 0.
-        for truth, num_docs in truth_to_doc.items():
+        for truth, num_docs in author_to_num_articles.items():
             total_true += num_docs
 
         overall_f = 0
-        for truth, num_docs in truth_to_doc.items():
+        for truth, num_docs in author_to_num_articles.items():
             def f_cell_bound(me):
                 return get_f_cell(truth, me)
             fscore = max(truth_to_me[truth].keys(), key=f_cell_bound)

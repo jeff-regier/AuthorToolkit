@@ -25,92 +25,83 @@ from cluster import Cluster
 class Agglomerator():
 
     CLUSTERS = set()
-    REF_TO_CLUSTER = {}
+    MENTION_TO_CLUSTER = {}
     INSTANCES = set()
 
-    def __init__(self, author_refs):
-        self.load_clusters(author_refs)
+    def __init__(self, mentions):
+        self.load_clusters(mentions)
         self.INSTANCES.add(self)
-        self.load_compat_mat(author_refs)
+        self.load_compat_mat(mentions)
 
-    def load_compat_mat(self, author_refs):
+    def pairs_iter(self):
+        clusters_list = sorted(list(self.clusters), key=lambda c: c.full_name())
+        for i in xrange(len(clusters_list)):
+            for j in xrange(i + 1, len(clusters_list)):
+                c1, c2 = clusters_list[i], clusters_list[j]
+                if utils.compatible_names(c1, c2):
+                    yield (c1, c2)
+
+    def safe_pairs_iter(self):
+        for c1, c2 in self.pairs_iter():
+            if utils.compatible_names(c1, c2):
+                if self.stricter_than(c1, c2) or self.stricter_than(c2, c1)\
+                    or self.is_equivalent(c1, c2):
+                    yield (c1, c2)
+
+    def load_compat_mat(self, mentions):
         self.compat_map = defaultdict(set)
-        for a1 in author_refs:
-            for a2 in author_refs:
-                if utils.compatible_names(a1, a2):
-                    self.compat_map[a1].add(a2)
+        for m1 in mentions:
+            for m2 in mentions:
+                if utils.compatible_names(m1, m2):
+                    self.compat_map[m1].add(m2)
 
-    def get_partition_compat(self, part):
-        compat_maps = [self.compat_map[a] for a in part]
+    def get_partition_compat(self, c):
+        compat_maps = [self.compat_map[m] for m in c]
         return reduce(set.intersection, compat_maps)
 
-    def stricter_than(self, p_loose, p_strict):
-        compat1 = self.get_partition_compat(p_loose)
-        compat2 = self.get_partition_compat(p_strict)
+    def stricter_than(self, c_loose, c_strict):
+        compat1 = self.get_partition_compat(c_loose)
+        compat2 = self.get_partition_compat(c_strict)
         return compat1 > compat2
 
-    def is_equivalent(self, p1, p2):
-        compat1 = self.get_partition_compat(p1)
-        compat2 = self.get_partition_compat(p2)
+    def is_equivalent(self, c1, c2):
+        compat1 = self.get_partition_compat(c1)
+        compat2 = self.get_partition_compat(c2)
         return compat1 == compat2
 
-    def load_clusters(self, author_refs):
+    def load_clusters(self, mentions):
         self.clusters = set()
-        for r in author_refs:
-            p = Cluster(r)
-            self.clusters.add(p)
-            self.CLUSTERS.add(p)
-            self.REF_TO_CLUSTER[r] = p
-            p.parent = self
+        for m in mentions:
+            c = Cluster(m)
+            c.parent = self
+            self.clusters.add(c)
+            self.CLUSTERS.add(c)
+            self.MENTION_TO_CLUSTER[m] = c
 
     def distinct_authors(self, name_intersection):
         return 1
 
     @classmethod
-    def do_static_merge(cls, p_source, p_target):
+    def do_static_merge(cls, c_source, c_target):
         """By the time we're just folding in clusters, there's no need to maintain
         self.INSTANCES and self.clusters, so we just call this method
         """
-        p_target.extend(p_source)
-        p_source.parent = p_target.parent
-        cls.CLUSTERS.remove(p_source)
-        for r in p_source.author_refs:
-            cls.REF_TO_CLUSTER[r] = p_target
+        c_target.extend(c_source)
+        c_source.parent = c_target.parent
+        cls.CLUSTERS.remove(c_source)
+        for m in c_source.mentions:
+            cls.MENTION_TO_CLUSTER[m] = c_target
 
-    def do_self_merge(self, p_source, p_target):
-        self.clusters.remove(p_source)
-        self.do_static_merge(p_source, p_target)
-
-    def merge_obvious(self, similarity):
-        clusters_list = list(self.clusters)
-        for i in xrange(len(clusters_list)):
-            for j in xrange(i + 1, len(clusters_list)):
-                p1, p2 = clusters_list[i], clusters_list[j]
-                if similarity(p1, p2) > config.instant_merge_threshold:
-                    self.do_self_merge(p1, p2)
-                    break
-
-    def merge_best_one(self, similarity, threshold):
-        greatest_likelihood = -1.0
-        greatest_pair = None
-
-        clusters_list = list(self.clusters)
-        for i in xrange(len(clusters_list)):
-            for j in xrange(i + 1, len(clusters_list)):
-                p1, p2 = clusters_list[i], clusters_list[j]
-                likeness = similarity(p1, p2)
-                if likeness > greatest_likelihood:
-                    greatest_likelihood = likeness
-                    greatest_pair = (p1, p2)
-
-        if greatest_likelihood > threshold:
-            p1, p2 = greatest_pair
-            self.do_self_merge(p1, p2)
-            return True
-        return False
+    def do_self_merge(self, c_source, c_target):
+        self.clusters.remove(c_source)
+        self.do_static_merge(c_source, c_target)
 
     def run_merge(self, similarity, threshold):
-        self.merge_obvious(similarity)
-        while self.merge_best_one(similarity, threshold):
-            pass
+        clusters_list = sorted(list(self.clusters), key=lambda c: c.full_name())
+        for i in xrange(len(clusters_list)):
+            for j in xrange(i + 1, len(clusters_list)):
+                c1, c2 = clusters_list[i], clusters_list[j]
+                if similarity(c1, c2) > threshold:
+                    self.do_self_merge(c1, c2)
+                    break
 
