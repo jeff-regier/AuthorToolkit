@@ -1,5 +1,5 @@
 ===============================
-AuthorToolkit
+Author Toolkit
 ===============================
 
 .. image:: https://img.shields.io/pypi/v/authortoolkit.svg
@@ -19,13 +19,13 @@ AuthorToolkit
 Features
 --------
 
-AuthorToolkit is a suite of tools for automatically determining the identities of authors in collections of publications.
+Author Toolkit is a suite of tools for automatically determining the identities of authors in collections of publications.
 
 
 Credits
 ---------
 
-AuthorToolkit has been developed with support from The Bibliographic Knowledge Network.
+Author Toolkit has been developed with support from The Bibliographic Knowledge Network.
 
 Tools used in rendering this package:
 

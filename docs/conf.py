@@ -55,7 +55,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'AuthorToolkit'
+project = u'Author Toolkit'
 copyright = u'2015, Jeffrey Regier'
 
 # The version info for the project you're documenting, acts as replacement
@@ -209,7 +209,7 @@ latex_elements = {
 # [howto/manual]).
 latex_documents = [
     ('index', 'authortoolkit.tex',
-     u'AuthorToolkit Documentation',
+     u'Author Toolkit Documentation',
      u'Jeffrey Regier', 'manual'),
 ]
 
@@ -240,7 +240,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'authortoolkit',
-     u'AuthorToolkit Documentation',
+     u'Author Toolkit Documentation',
      [u'Jeffrey Regier'], 1)
 ]
 
@@ -255,7 +255,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     ('index', 'authortoolkit',
-     u'AuthorToolkit Documentation',
+     u'Author Toolkit Documentation',
      u'Jeffrey Regier',
      'authortoolkit',
      'One line description of project.',

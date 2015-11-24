@@ -2,6 +2,6 @@
 Usage
 ========
 
-To use AuthorToolkit in a project::
+To use Author Toolkit in a project::
 
     import authortoolkit
