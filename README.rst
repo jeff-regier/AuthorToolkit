@@ -12,14 +12,13 @@ Author Toolkit
         :target: https://readthedocs.org/projects/authortoolkit/?badge=latest
         :alt: Documentation Status
 
-
-* Free software: ISC license
-* Documentation: https://authortoolkit.readthedocs.org.
+Author Toolkit is a suite of tools for automatically determining the identities of authors in collections of publications.
 
 Features
 --------
 
-Author Toolkit is a suite of tools for automatically determining the identities of authors in collections of publications.
+* Free software: Apache 2.0 license
+* Documentation: https://authortoolkit.readthedocs.org.
 
 
 Credits
@@ -27,11 +26,4 @@ Credits
 
 Author Toolkit has been developed with support from The Bibliographic Knowledge Network.
 
-Tools used in rendering this package:
-
-*  Cookiecutter_
-*  `cookiecutter-pypackage`_
-
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
 
