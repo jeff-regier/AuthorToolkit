@@ -6,7 +6,7 @@ deploy:
     tags: true
   distributions: sdist bdist_wheel
   password:
-    secure: Zs0/u4XtaB0NkopNmc/QMzjJlU1d2MPChtUf6JOOoxIjzJb+Mwl0hE/GuYZ3euDqNDJ3KmwuhHo1hGvK9c6L4Y9mQaru3CFj3GOB2mJOW2u5f75Oc4sp824ClD1CBGH+SwcbEEvVvMcRUrPIzJDs1PSKJXBuUpjnHkarlKI08Vs=
+    secure: XqNTws4SJnPvOpEpMSAuy3drOTAp/TuCUson6skuNx9jm7ctFMb5mVzlIVtUCtH0oWppgWd/yhmRjf73SQaRytRWOcpXgVcLdCLf2mLY5Bef58G4YjUSnb6vkbRm5sHkgrEhhzZIy+1p9+3le+MJscEaamCMzMCNbZG1jwXAEto=
   provider: pypi
   user: jeff-regier
 env:
