@@ -8,7 +8,7 @@ Author Toolkit
 .. image:: https://img.shields.io/travis/jeff-regier/authortoolkit.svg
         :target: https://travis-ci.org/jeff-regier/authortoolkit
 
-.. image:: http://authortoolkit.readthedocs.org/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/authortoolkit/badge/?version=latest
         :target: http://authortoolkit.readthedocs.org/en/latest/?badge=latest
         :alt: Documentation Status
 
